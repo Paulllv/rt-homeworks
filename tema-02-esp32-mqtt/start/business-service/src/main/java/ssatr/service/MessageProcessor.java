@@ -34,5 +34,53 @@ public class MessageProcessor implements Runnable {
         //   - actualizați dashboard-ul, în funcție de kind
         //   - alarmele și confirmările se afișează imediat în consolă
         //   - un mesaj greșit (format invalid) nu trebuie să oprească thread-ul
+        while (!Thread.currentThread().isInterrupted()) {
+            try {
+                String message = inbox.take();
+                storage.append(kind, message);
+
+                String[] parts = message.split(";", 3);
+                if (parts.length < 3) {
+                    System.out.println("[" + kind + "] mesaj cu format invalid ignorat: " + message);
+                    continue;
+                }
+
+                String deviceId = parts[0].trim();
+                long timestamp = Long.parseLong(parts[1].trim());
+                String rest = parts[2].trim();
+
+                switch (kind) {
+                    case "telemetry": {
+                        double temp = Double.parseDouble(rest);
+                        dashboard.updateTelemetry(deviceId, timestamp, temp);
+                        break;
+                    }
+                    case "alarm": {
+                        String[] alarmParts = rest.split(";");
+                        if (alarmParts.length < 2) {
+                            System.out.println("[alarm] format invalid: " + message);
+                            continue;
+                        }
+                        double temp = Double.parseDouble(alarmParts[0].trim());
+                        double threshold = Double.parseDouble(alarmParts[1].trim());
+                        dashboard.updateAlarm(deviceId, timestamp, temp);
+                        System.out.printf("[ALARMĂ] %s: %.2f °C (prag %.2f °C)%n", deviceId, temp, threshold);
+                        break;
+                    }
+                    case "status": {
+                        dashboard.updateStatus(deviceId, timestamp, rest);
+                        System.out.printf("[STATUS] %s: %s%n", deviceId, rest);
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                System.out.println("[" + kind + "] eroare la prelucrarea mesajului: " + e.getMessage());
+            }
+        }
     }
 }

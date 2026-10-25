@@ -48,7 +48,22 @@ public class CommandConsole implements Runnable {
         //   ("device-1 SET_INTERVAL 1000" -> "device-1" și "SET_INTERVAL 1000")
         //   și publicați comanda pe Config.commandTopic(deviceId).
         //   Afișați un mesaj de eroare dacă linia nu are formatul corect.
-        System.out.println("(trimiterea comenzilor neimplementată): " + line);
+        int firstSpace = line.indexOf(' ');
+        if (firstSpace <= 0 || firstSpace == line.length() - 1) {
+            System.out.println("Format invalid! Folosiți: <deviceId> <COMANDA> [parametru]");
+            return;
+        }
+
+        String deviceId = line.substring(0, firstSpace).trim();
+        String command = line.substring(firstSpace + 1).trim();
+
+        if (deviceId.isEmpty() || command.isEmpty()) {
+            System.out.println("Format invalid! Folosiți: <deviceId> <COMANDA> [parametru]");
+            return;
+        }
+
+        mqtt.publish(Config.commandTopic(deviceId), command);
+        System.out.println("Comandă trimisă către " + deviceId + ": " + command);
     }
 
     private void printHelp() {

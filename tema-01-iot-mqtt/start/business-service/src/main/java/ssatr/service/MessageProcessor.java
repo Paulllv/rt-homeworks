@@ -34,5 +34,46 @@ public class MessageProcessor implements Runnable {
         //   - actualizați dashboard-ul, în funcție de kind
         //   - alarmele și confirmările se afișează imediat în consolă
         //   - un mesaj greșit (format invalid) nu trebuie să oprească thread-ul
+
+        try {
+            while (!Thread.currentThread().isInterrupted()) {
+                String mesaj = inbox.take();
+                storage.append(kind, mesaj);
+
+                try {
+                    String[] parts = mesaj.split(";", 3);
+                    if (parts.length < 3) {
+                        System.out.println("Mesaj cu format invalid (" + kind + "): " + mesaj);
+                        continue;
+                    }
+
+                    String deviceId = parts[0];
+                    long timestamp = Long.parseLong(parts[1]);
+
+                    switch (kind) {
+                        case "telemetry":
+                            double temp = Double.parseDouble(parts[2]);
+                            dashboard.updateTelemetry(deviceId, timestamp, temp);
+                            break;
+
+                        case "alarm":
+                            String[] alarmFields = parts[2].split(";");
+                            double alarmTemp = Double.parseDouble(alarmFields[0]);
+                            dashboard.updateAlarm(deviceId, timestamp, alarmTemp);
+                            System.out.println("[ALARM] " + mesaj);
+                            break;
+
+                        case "status":
+                            dashboard.updateStatus(deviceId, timestamp);
+                            System.out.println("[STATUS] " + mesaj);
+                            break;
+                    }
+                } catch (Exception e) {
+                    System.out.println("Mesaj invalid ignorat (" + kind + "): " + mesaj);
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

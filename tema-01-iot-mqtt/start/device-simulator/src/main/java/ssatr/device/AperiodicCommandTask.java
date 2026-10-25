@@ -1,5 +1,6 @@
 package ssatr.device;
 
+import java.util.Locale;
 import java.util.concurrent.BlockingQueue;
 
 /**
@@ -46,5 +47,65 @@ public class AperiodicCommandTask implements Runnable {
         //     oprească taskul: publicați "ERROR <motiv>"
         //
         // Vezi exemplul exemple/01-taskuri/.../AperiodicTaskExample.java
+
+        try {
+            while (!Thread.currentThread().isInterrupted()) {
+                String command = commands.take().trim();
+                String text;
+
+                try {
+                    String[] parts = command.split(" ");
+                    String name = parts[0];
+
+                    switch (name) {
+                        case "SET_INTERVAL":
+                            if (parts.length != 2) {
+                                text = "ERROR Parametru lipsa pentru SET_INTERVAL";
+                            } else {
+                                long ms = Long.parseLong(parts[1]);
+                                if (ms <= 0) {
+                                    text = "ERROR Intervalul trebuie sa fie pozitiv";
+                                } else {
+                                    periodic.setPeriodMs(ms);
+                                    text = "OK SET_INTERVAL " + ms;
+                                }
+                            }
+                            break;
+
+                        case "SET_THRESHOLD":
+                            if (parts.length != 2) {
+                                text = "ERROR Parametru lipsa pentru SET_THRESHOLD";
+                            } else {
+                                double val = Double.parseDouble(parts[1]);
+                                periodic.setThreshold(val);
+                                text = String.format(Locale.US, "OK SET_THRESHOLD %.2f", val);
+                            }
+                            break;
+
+                        case "RESET":
+                            sensor.reset();
+                            text = "OK RESET";
+                            break;
+
+                        case "STATUS":
+                            text = String.format(Locale.US, "OK STATUS period=%d threshold=%.2f",
+                                    periodic.getPeriodMs(), periodic.getThreshold());
+                            break;
+
+                        default:
+                            text = "ERROR Comanda necunoscuta: " + name;
+                            break;
+                    }
+                } catch (Exception e) {
+                    text = "ERROR Parametru invalid: " + e.getMessage();
+                }
+
+                String statusMsg = String.format("%s;%d;%s", deviceId, System.currentTimeMillis(), text);
+                mqtt.publish(Config.statusTopic(deviceId), statusMsg);
+                System.out.println("[aperiodic] " + statusMsg);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }
